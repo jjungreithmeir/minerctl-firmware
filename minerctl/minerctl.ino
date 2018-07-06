@@ -29,7 +29,8 @@ int sensor = 0;                     //which sensor to use for the PID controller
 int filter_threshold = 0;           //value in mBar
 int sensorTemps[] = {0, 0, 0, 0};   //values in °C
 int pressure = 0;                   //value in mBar of pressure difference
-
+bool filter_ok = true;
+bool status = true;
 //------------------------------------------------------------------------------
 
 //------------------//
@@ -89,6 +90,7 @@ void getPidB(SerialCommands* sender)
 {
   
 }
+//----------------------------//
 
 //?temps
 void getTemps(SerialCommands* sender)
@@ -155,6 +157,17 @@ void getResTime(SerialCommands* sender)
 {
   
 }
+
+//------------------------------------------------------------------------------
+
+//-------------------//
+// SERVICE FUNCTIONS //
+//-------------------//
+
+void check_filter_status() {
+  filter_ok = filter_threshold < pressure;
+}
+
 //------------------------------------------------------------------------------
 
 //-----------------//
@@ -162,7 +175,10 @@ void getResTime(SerialCommands* sender)
 //-----------------//
 void dummyTimer()
 {
-  
+  digitalWrite(PB0, status);
+  status = !status;
+  check_filter_status();
+  digitalWrite(PB7, !filter_ok);
 }
 
 //------------------------------------------------------------------------------
@@ -213,6 +229,10 @@ void add_serial_commands()
 // SETUP CODE AND MAIN LOOP //
 //--------------------------//
 void setup() {
+  pinMode(PB0, OUTPUT);
+  pinMode(PB7, OUTPUT);
+  pinMode(PB14, OUTPUT);
+
   Serial.begin(9600);
 
   timer.setInterval(1000, dummyTimer);
