@@ -149,12 +149,12 @@ void setPidB(SerialCommands* sender) { setArgument(sender, pidB); } //!pidb
 
 //!miner <id> <action>
 void setMiner(SerialCommands* sender) {
- String raw_id = String(sender->Next());
- if (raw_id == "") {
-  returnERR(sender, "no argument given");
-  return;
- }
- // TODO invalid argument given
+  String raw_id = String(sender->Next());
+  if (raw_id == "") {
+    returnERR(sender, "no argument given");
+    return;
+  }
+  // TODO invalid argument given
 
   int id = raw_id.toInt();
   String action = String(sender->Next());
@@ -223,10 +223,14 @@ void mock_changes() {
 //-----------------//
 // TIMER FUNCTIONS //
 //-----------------//
-void dummyTimer() {
+void mainTimer() {
   mock_changes();
+
+  // blinking green status LED
   digitalWrite(PB0, status);
   status = !status;
+
+  // flashing blue LED if filter needs cleaning
   check_filter_status();
   digitalWrite(PB7, !filter_ok);
 }
@@ -322,7 +326,7 @@ void setup() {
 
   Serial.begin(9600);
 
-  timer.setInterval(1000, dummyTimer);
+  timer.setInterval(1000, mainTimer);
   
   add_serial_commands();
   init_values();
