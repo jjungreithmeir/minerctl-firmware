@@ -12,7 +12,7 @@ SimpleTimer timer;
 //------------------//
 // GLOBAL VARIABLES //
 //------------------//
-char fwVersion[4] = "0.2";
+char fw_version[4] = "0.2";
 int target_temp;
 int pidP;
 int pidI;
@@ -60,17 +60,19 @@ const int ADDR_EXTERNAL = addr();
 const int ADDR_MODE = addr();
 const int ADDR_TEMPS = addr(); //int[4] size = 16 byte
 const int ADDR_VERSION = addr(sizeof(sensor_temps)); //String size = 12 byte
-const int ADDR_MINERS = addr(sizeof(fwVersion)); //int[120] size = 480 byte
+const int ADDR_MINERS = addr(sizeof(fw_version)); //int[120] size = 480 byte
 
 //------------------//
 // HELPER FUNCTIONS //
 //------------------//
-void returnOK(SerialCommands* sender) { echo(sender, "OK"); }
-void returnOK(SerialCommands* sender, String msg) { echo(sender, "OK - " + msg); }
-void returnERR(SerialCommands* sender) { echo(sender, "ERR"); }
-void returnERR(SerialCommands* sender, String msg) { echo(sender, "ERR - " + msg); }
+void return_OK(SerialCommands* sender) { echo(sender, "OK"); }
+void return_OK(SerialCommands* sender, String msg) { echo(sender, "OK - " + msg); }
+void return_ERR(SerialCommands* sender) { echo(sender, "ERR"); }
+void return_ERR(SerialCommands* sender, String msg) { echo(sender, "ERR - " + msg); }
 
-//This is the default handler, and gets called when no other command matches. 
+/*
+ * This is the default handler, and gets called when no other command matches.
+ */
 void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
   sender->GetSerial()->print("Unrecognized command [");
   sender->GetSerial()->print(cmd);
@@ -83,12 +85,12 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
  */
 bool check_param(SerialCommands* sender, char* param) {
   if (param == NULL) {
-    returnERR(sender, "no argument given");
+    return_ERR(sender, "no argument given");
     return false;
   }
   for (int i = 0; i < sizeof(param)/sizeof(char); ++i) {
     if (!isDigit(param[i]) and param[i] != '\0') { // if no digit and not empty
-      returnERR(sender, "invalid ID given");
+      return_ERR(sender, "invalid ID given");
       return false;
     } 
   }
@@ -99,7 +101,7 @@ bool check_param(SerialCommands* sender, char* param) {
  * Checks the param (see check_param) internally and sets the resulting int
  * as the referenced variable value.
  */
-void setArgument(SerialCommands* sender, int& injectedVar) {
+void set_arg(SerialCommands* sender, int& injectedVar) {
   char* temp = sender->Next();
   if (!check_param(sender, temp)) {
     return;
@@ -110,31 +112,34 @@ void setArgument(SerialCommands* sender, int& injectedVar) {
 /*
  * The set method also returns the value to ease the process of syncronization. eg. int var1 = setEEPROM(ADDR, 12345)
  */
-int setEEPROMval(int address, int value) { EEPROM.update(address, value); return value; }
-void setEEPROMval(int address, char *value) { 
+int set_EEPROM(int address, int value) { EEPROM.update(address, value); return value; }
+void set_EEPROM(int address, char *value) { 
   for(int i=0; i < sizeof(value)/sizeof(char); ++i) {
     EEPROM.update(address + i * sizeof(char), value[i]);
   }
 }
-int getEEPROMval(int address) { return EEPROM.read(address); }
+int get_EEPROM(int address) { return EEPROM.read(address); }
 
-void getEEPROMval(int address, char *store) {
+void get_EEPROM(int address, char *store) {
   for (int i = 0; i < sizeof(store)/sizeof(char); ++i) {
     store[i] = EEPROM.read(address + i * sizeof(char));
   }
 }
 
-// Theoretically this clears the EEPROM, but I recommend against executing this because it is
-// incredibly slow and it hurts the lifetime of the flash memory of the nucleo board (as it has no real EEPROM)
-void clearEEPROM() {
+/*
+ * Theoretically this clears the EEPROM, but I recommend against executing this because it is
+ * incredibly slow and it hurts the lifetime of the flash memory of the nucleo board (as it has no real EEPROM)
+ */
+void clear_EEPROM() {
   for (int i = 0 ; i < EEPROM.length() ; ++i) {
     EEPROM.write(i, 0);
     Serial.println(i);
   }
 }
 
-bool EEPROMisEmpty() {
-  return getEEPROMval(ADDR_INIT_MARKER) == 255;
+bool EEPROM_is_empty() {
+  // TODO remove marker and exchange for crc
+  return get_EEPROM(ADDR_INIT_MARKER) == 255;
 }
 
 // TODO call this somewhere
@@ -167,27 +172,27 @@ void echo(SerialCommands* sender, String var) { sender->GetSerial()->println(var
 // USER INTERACTION FUNCTIONS //
 //----------------------------//
 
-void printFWVersion(SerialCommands* sender) { echo(sender, fwVersion); } //?fw
-void getPidP(SerialCommands* sender) { echo(sender, pidP); } //?pidp
-void getPidI(SerialCommands* sender) { echo(sender, pidI); } //?pidi
-void getPidD(SerialCommands* sender) { echo(sender, pidD); } //?pidd
-void getPidB(SerialCommands* sender) { echo(sender, pidB); } //?pidb
-void getTargetTemperature(SerialCommands* sender) { echo(sender, target_temp); } //?targettemp
-void getPress(SerialCommands* sender) { echo(sender, pressure); } //?pressure
-void getPressThreshold(SerialCommands* sender) { echo(sender, filter_threshold); } //?threshold
-void getFilter(SerialCommands* sender) { echo(sender, filter_ok); } //?filter
-void getSensor(SerialCommands* sender) { echo(sender, sensor); } //?sensor
-void getMinRPM(SerialCommands* sender) { echo(sender, minrpm); } //?minrpm
-void getMaxRPM(SerialCommands* sender) { echo(sender, maxrpm); } //?maxrpm
-void getRPM(SerialCommands* sender) { echo(sender, rpm); } //?rpm
-void getOnTime(SerialCommands* sender) { echo(sender, ontime); } //?ontime
-void getOffTime(SerialCommands* sender) { echo(sender, offtime); } //?offtime
-void getResTime(SerialCommands* sender) { echo(sender, restime); } //?restime
-void getExternalReference(SerialCommands* sender) { echo(sender, restime); } //?external
-void getMode(SerialCommands* sender) { echo(sender, mode); } //?mode
+void get_fw_version(SerialCommands* sender) { echo(sender, fw_version); } //?fw
+void get_pidp(SerialCommands* sender) { echo(sender, pidP); } //?pidp
+void get_pidi(SerialCommands* sender) { echo(sender, pidI); } //?pidi
+void get_pidd(SerialCommands* sender) { echo(sender, pidD); } //?pidd
+void get_pidb(SerialCommands* sender) { echo(sender, pidB); } //?pidb
+void get_target_temp(SerialCommands* sender) { echo(sender, target_temp); } //?targettemp
+void get_pressure(SerialCommands* sender) { echo(sender, pressure); } //?pressure
+void get_pressure_threshold(SerialCommands* sender) { echo(sender, filter_threshold); } //?threshold
+void get_filter(SerialCommands* sender) { echo(sender, filter_ok); } //?filter
+void get_sensor(SerialCommands* sender) { echo(sender, sensor); } //?sensor
+void get_minrpm(SerialCommands* sender) { echo(sender, minrpm); } //?minrpm
+void get_maxrpm(SerialCommands* sender) { echo(sender, maxrpm); } //?maxrpm
+void get_rpm(SerialCommands* sender) { echo(sender, rpm); } //?rpm
+void get_ontime(SerialCommands* sender) { echo(sender, ontime); } //?ontime
+void get_offtime(SerialCommands* sender) { echo(sender, offtime); } //?offtime
+void get_restime(SerialCommands* sender) { echo(sender, restime); } //?restime
+void get_external_reference(SerialCommands* sender) { echo(sender, restime); } //?external
+void get_mode(SerialCommands* sender) { echo(sender, mode); } //?mode
 
 //?temps
-void getTemps(SerialCommands* sender) {
+void get_temps(SerialCommands* sender) {
   String temp = "";
   for (int i = 0; i < sizeof(sensor_temps)/sizeof(int); ++i) {
     temp += i;
@@ -200,45 +205,45 @@ void getTemps(SerialCommands* sender) {
 }
 
 //?miner <id>
-void getMiner(SerialCommands* sender) {
+void get_miner(SerialCommands* sender) {
   String raw_id = String(sender->Next());
   if (raw_id == "") {
-    returnERR(sender, "no argument given");
+    return_ERR(sender, "no argument given");
     return;
   }
   // TODO invalid argument given
 
   int id = raw_id.toInt();
   if (id < 0 or id >= MAX_MINERS) {
-    returnERR(sender, "invalid ID given");
+    return_ERR(sender, "invalid ID given");
     return;
   }
   echo(sender, miners[id]);
 }
 
-void setTargetTemperature(SerialCommands* sender) {
-  setArgument(sender, target_temp);
-  setEEPROMval(ADDR_TARGET_TEMP, target_temp);
+void set_target_temp(SerialCommands* sender) {
+  set_arg(sender, target_temp);
+  set_EEPROM(ADDR_TARGET_TEMP, target_temp);
 } //!targettemp
-void setSensor(SerialCommands* sender) { setArgument(sender, sensor); } //!sensor
-void setExternalReference(SerialCommands* sender) { setArgument(sender, external_reference); } //!external
-void setPressureThreshold(SerialCommands* sender) { setArgument(sender, filter_threshold); } //!threshold
-void setMinRPM(SerialCommands* sender) { setArgument(sender, minrpm); } //!minrpm
-void setMaxRPM(SerialCommands* sender) { setArgument(sender, maxrpm); } //!maxrpm
-void setMode(SerialCommands* sender) { setArgument(sender, mode); } //!mode
-void setOntime(SerialCommands* sender) { setArgument(sender, ontime); } //!ontime
-void setOfftime(SerialCommands* sender) { setArgument(sender, offtime); } //!offtime
-void setRestime(SerialCommands* sender) { setArgument(sender, restime); } //!restime
-void setPidP(SerialCommands* sender) { setArgument(sender, pidP); } //!pidp
-void setPidI(SerialCommands* sender) { setArgument(sender, pidI); } //!pidi
-void setPidD(SerialCommands* sender) { setArgument(sender, pidD); } //!pidd
-void setPidB(SerialCommands* sender) { setArgument(sender, pidB); } //!pidb
+void set_sensor(SerialCommands* sender) { set_arg(sender, sensor); } //!sensor
+void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference); } //!external
+void set_pressure_threshold(SerialCommands* sender) { set_arg(sender, filter_threshold); } //!threshold
+void set_minrpm(SerialCommands* sender) { set_arg(sender, minrpm); } //!minrpm
+void set_maxrpm(SerialCommands* sender) { set_arg(sender, maxrpm); } //!maxrpm
+void set_mode(SerialCommands* sender) { set_arg(sender, mode); } //!mode
+void set_ontime(SerialCommands* sender) { set_arg(sender, ontime); } //!ontime
+void set_offtime(SerialCommands* sender) { set_arg(sender, offtime); } //!offtime
+void set_restime(SerialCommands* sender) { set_arg(sender, restime); } //!restime
+void set_pidp(SerialCommands* sender) { set_arg(sender, pidP); } //!pidp
+void set_pidi(SerialCommands* sender) { set_arg(sender, pidI); } //!pidi
+void set_pidd(SerialCommands* sender) { set_arg(sender, pidD); } //!pidd
+void set_pidb(SerialCommands* sender) { set_arg(sender, pidB); } //!pidb
 
 //!miner <id> <action>
-void setMiner(SerialCommands* sender) {
+void set_miner(SerialCommands* sender) {
   String raw_id = String(sender->Next());
   if (raw_id == "") {
-    returnERR(sender, "no argument given");
+    return_ERR(sender, "no argument given");
     return;
   }
   // TODO invalid argument given
@@ -246,11 +251,11 @@ void setMiner(SerialCommands* sender) {
   int id = raw_id.toInt();
   String action = String(sender->Next());
   if (action == NULL) {
-    returnERR(sender, "no argument given");
+    return_ERR(sender, "no argument given");
     return;
   } 
   if (action != "on" and action != "off" and action != "register" and action != "deregister") {
-    returnERR(sender, "invalid argument given");
+    return_ERR(sender, "invalid argument given");
     return;
   }
   if (action == "on" or action =="register") {
@@ -273,19 +278,19 @@ void check_filter_status() {
 }
 
 void init_values() {
-  target_temp = setEEPROMval(ADDR_TARGET_TEMP, 50);
-  pidP = setEEPROMval(ADDR_PIDP, 1);
-  pidI = setEEPROMval(ADDR_PIDI, 3);
-  pidD = setEEPROMval(ADDR_PIDD, 4);
-  pidB = setEEPROMval(ADDR_PIDB, 2);
-  minrpm = setEEPROMval(ADDR_MINRPM, 5);
-  maxrpm = setEEPROMval(ADDR_MAXRPM, 80);
-  ontime = setEEPROMval(ADDR_ONTIME, 100);
-  offtime = setEEPROMval(ADDR_OFFTIME, 85);
-  restime = setEEPROMval(ADDR_RESTIME, 125);
-  sensor = setEEPROMval(ADDR_SENSOR, 1);
-  filter_threshold = setEEPROMval(ADDR_THRESHOLD, 1400);
-  external_reference = setEEPROMval(ADDR_EXTERNAL, 55);
+  target_temp = set_EEPROM(ADDR_TARGET_TEMP, 50);
+  pidP = set_EEPROM(ADDR_PIDP, 1);
+  pidI = set_EEPROM(ADDR_PIDI, 3);
+  pidD = set_EEPROM(ADDR_PIDD, 4);
+  pidB = set_EEPROM(ADDR_PIDB, 2);
+  minrpm = set_EEPROM(ADDR_MINRPM, 5);
+  maxrpm = set_EEPROM(ADDR_MAXRPM, 80);
+  ontime = set_EEPROM(ADDR_ONTIME, 100);
+  offtime = set_EEPROM(ADDR_OFFTIME, 85);
+  restime = set_EEPROM(ADDR_RESTIME, 125);
+  sensor = set_EEPROM(ADDR_SENSOR, 1);
+  filter_threshold = set_EEPROM(ADDR_THRESHOLD, 1400);
+  external_reference = set_EEPROM(ADDR_EXTERNAL, 55);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     if (random(0, 100) < 3) {
       miners[i] = -1;
@@ -294,26 +299,26 @@ void init_values() {
     } else {
       miners[i] = 1;
     }
-    setEEPROMval(ADDR_MINERS + i * sizeof(int), miners[i]);
+    set_EEPROM(ADDR_MINERS + i * sizeof(int), miners[i]);
   }
 }
 
 void load_values() {
-  target_temp = getEEPROMval(ADDR_TARGET_TEMP);
-  pidP = getEEPROMval(ADDR_PIDP);
-  pidI = getEEPROMval(ADDR_PIDI);
-  pidD = getEEPROMval(ADDR_PIDD);
-  pidB = getEEPROMval(ADDR_PIDB);
-  minrpm = getEEPROMval(ADDR_MINRPM);
-  maxrpm = getEEPROMval(ADDR_MAXRPM);
-  ontime = getEEPROMval(ADDR_ONTIME);
-  offtime = getEEPROMval(ADDR_OFFTIME);
-  restime = getEEPROMval(ADDR_RESTIME);
-  sensor = getEEPROMval(ADDR_SENSOR);
-  filter_threshold = getEEPROMval(ADDR_THRESHOLD);
-  external_reference = getEEPROMval(ADDR_EXTERNAL);
+  target_temp = get_EEPROM(ADDR_TARGET_TEMP);
+  pidP = get_EEPROM(ADDR_PIDP);
+  pidI = get_EEPROM(ADDR_PIDI);
+  pidD = get_EEPROM(ADDR_PIDD);
+  pidB = get_EEPROM(ADDR_PIDB);
+  minrpm = get_EEPROM(ADDR_MINRPM);
+  maxrpm = get_EEPROM(ADDR_MAXRPM);
+  ontime = get_EEPROM(ADDR_ONTIME);
+  offtime = get_EEPROM(ADDR_OFFTIME);
+  restime = get_EEPROM(ADDR_RESTIME);
+  sensor = get_EEPROM(ADDR_SENSOR);
+  filter_threshold = get_EEPROM(ADDR_THRESHOLD);
+  external_reference = get_EEPROM(ADDR_EXTERNAL);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
-    miners[i] = getEEPROMval(ADDR_MINERS + i * sizeof(int));
+    miners[i] = get_EEPROM(ADDR_MINERS + i * sizeof(int));
   }
 }
 
@@ -330,7 +335,7 @@ void mock_changes() {
 //-----------------//
 // TIMER FUNCTIONS //
 //-----------------//
-void mainTimer() {
+void main_timer() {
   mock_changes();
 
   // blinking green status LED
@@ -347,40 +352,40 @@ void mainTimer() {
 //-----------------//
 // SERIAL COMMANDS //
 //-----------------//
-SerialCommand cmd_fw("?fw", printFWVersion);
-SerialCommand cmd_getpidp("?pidp", getPidP);
-SerialCommand cmd_getpidi("?pidi", getPidI);
-SerialCommand cmd_getpidd("?pidd", getPidD);
-SerialCommand cmd_getpidb("?pidb", getPidB);
-SerialCommand cmd_gettemps("?temps", getTemps);
-SerialCommand cmd_gettargettemp("?targettemp", getTargetTemperature);
-SerialCommand cmd_getpress("?pressure", getPress);
-SerialCommand cmd_getpressthreshold("?threshold", getPressThreshold);
-SerialCommand cmd_getfilter("?filter", getFilter);
-SerialCommand cmd_getsensor("?sensor", getSensor);
-SerialCommand cmd_getminrpm("?minrpm", getMinRPM);
-SerialCommand cmd_getmaxrpm("?maxrpm", getMaxRPM);
-SerialCommand cmd_getrpm("?rpm", getRPM);
-SerialCommand cmd_getontime("?ontime", getOnTime);
-SerialCommand cmd_getofftime("?offtime", getOffTime);
-SerialCommand cmd_getrestime("?restime", getResTime);
-SerialCommand cmd_getexternal("?external", getExternalReference);
-SerialCommand cmd_getmode("?mode", getMode);
-SerialCommand cmd_getminer("?miner", getMiner);
-SerialCommand cmd_settargettemp("!targettemp", setTargetTemperature);
-SerialCommand cmd_setexternalreference("!external", setExternalReference);
-SerialCommand cmd_setpressurethreshold("!threshold", setPressureThreshold);
-SerialCommand cmd_setmaxrpm("!maxrpm", setMaxRPM);
-SerialCommand cmd_setminrpm("!minrpm", setMinRPM);
-SerialCommand cmd_setmode("!mode", setMode);
-SerialCommand cmd_setontime("!ontime", setOntime);
-SerialCommand cmd_setofftime("!offtime", setOfftime);
-SerialCommand cmd_setrestime("!restime", setRestime);
-SerialCommand cmd_setpidp("!pidp", setPidP);
-SerialCommand cmd_setpidi("!pidi", setPidI);
-SerialCommand cmd_setpidd("!pidd", setPidD);
-SerialCommand cmd_setpidb("!pidb", setPidB);
-SerialCommand cmd_setminer("!miner", setMiner);
+SerialCommand cmd_fw("?fw", get_fw_version);
+SerialCommand cmd_getpidp("?pidp", get_pidp);
+SerialCommand cmd_getpidi("?pidi", get_pidi);
+SerialCommand cmd_getpidd("?pidd", get_pidd);
+SerialCommand cmd_getpidb("?pidb", get_pidb);
+SerialCommand cmd_gettemps("?temps", get_temps);
+SerialCommand cmd_gettargettemp("?targettemp", get_target_temp);
+SerialCommand cmd_getpress("?pressure", get_pressure);
+SerialCommand cmd_getpressthreshold("?threshold", get_pressure_threshold);
+SerialCommand cmd_getfilter("?filter", get_filter);
+SerialCommand cmd_getsensor("?sensor", get_sensor);
+SerialCommand cmd_getminrpm("?minrpm", get_minrpm);
+SerialCommand cmd_getmaxrpm("?maxrpm", get_maxrpm);
+SerialCommand cmd_getrpm("?rpm", get_rpm);
+SerialCommand cmd_getontime("?ontime", get_ontime);
+SerialCommand cmd_getofftime("?offtime", get_offtime);
+SerialCommand cmd_getrestime("?restime", get_restime);
+SerialCommand cmd_getexternal("?external", get_external_reference);
+SerialCommand cmd_getmode("?mode", get_mode);
+SerialCommand cmd_getminer("?miner", get_miner);
+SerialCommand cmd_settargettemp("!targettemp", set_target_temp);
+SerialCommand cmd_setexternalreference("!external", set_external_reference);
+SerialCommand cmd_setpressurethreshold("!threshold", set_pressure_threshold);
+SerialCommand cmd_setmaxrpm("!maxrpm", set_maxrpm);
+SerialCommand cmd_setminrpm("!minrpm", set_minrpm);
+SerialCommand cmd_setmode("!mode", set_mode);
+SerialCommand cmd_setontime("!ontime", set_ontime);
+SerialCommand cmd_setofftime("!offtime", set_offtime);
+SerialCommand cmd_setrestime("!restime", set_restime);
+SerialCommand cmd_setpidp("!pidp", set_pidp);
+SerialCommand cmd_setpidi("!pidi", set_pidi);
+SerialCommand cmd_setpidd("!pidd", set_pidd);
+SerialCommand cmd_setpidb("!pidb", set_pidb);
+SerialCommand cmd_setminer("!miner", set_miner);
 
 void add_serial_commands() {
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
@@ -434,17 +439,16 @@ void setup() {
 
   // the following line is only used for testing/debugging. straight-out-of-factory EEPROMs
   // have 255 written all over the memory
-  // setEEPROMval(ADDR_INIT_MARKER, 255);
-  if (EEPROMisEmpty()) {
+  // set_EEPROM(ADDR_INIT_MARKER, 255);
+  if (EEPROM_is_empty()) {
     Serial.println("Initializing values. This may take a minute or two.");
     init_values();
   } else {
-    // TODO
-    setEEPROMval(ADDR_INIT_MARKER, 1);
+    set_EEPROM(ADDR_INIT_MARKER, 1);
     load_values();
   }
   
-  timer.setInterval(1000, mainTimer);
+  timer.setInterval(1000, main_timer);
   add_serial_commands();
 }
 
