@@ -36,14 +36,14 @@ bool filter_ok = true;
 bool status = true;
 //------------------------------------------------------------------------------
 
-int addr_marker = -4;
+int addr_marker = -sizeof(int);
 int addr(int offset) { addr_marker += offset; return addr_marker; }
-int addr() { return addr(4); }
+int addr() { return addr(sizeof(int)); }
 
 //------------------//
 // EEPROM ADDRESSES //
 //------------------//
-const int ADDR_INIT_MARKER = addr(); //int size 4 byte
+const int ADDR_INIT_MARKER = addr();
 const int ADDR_TARGET_TEMP = addr();
 const int ADDR_PIDP = addr();
 const int ADDR_PIDI = addr();
@@ -107,6 +107,11 @@ void set_arg(SerialCommands* sender, int& injectedVar) {
     return;
   }
   injectedVar = atoi(temp);
+}
+
+void set_arg(SerialCommands* sender, int& injectedVar, int address) {
+  set_arg(sender, injectedVar);
+  set_EEPROM(address, injectedVar);
 }
 
 /*
@@ -221,23 +226,20 @@ void get_miner(SerialCommands* sender) {
   echo(sender, miners[id]);
 }
 
-void set_target_temp(SerialCommands* sender) {
-  set_arg(sender, target_temp);
-  set_EEPROM(ADDR_TARGET_TEMP, target_temp);
-} //!targettemp
-void set_sensor(SerialCommands* sender) { set_arg(sender, sensor); } //!sensor
-void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference); } //!external
-void set_pressure_threshold(SerialCommands* sender) { set_arg(sender, filter_threshold); } //!threshold
-void set_minrpm(SerialCommands* sender) { set_arg(sender, minrpm); } //!minrpm
-void set_maxrpm(SerialCommands* sender) { set_arg(sender, maxrpm); } //!maxrpm
-void set_mode(SerialCommands* sender) { set_arg(sender, mode); } //!mode
-void set_ontime(SerialCommands* sender) { set_arg(sender, ontime); } //!ontime
-void set_offtime(SerialCommands* sender) { set_arg(sender, offtime); } //!offtime
-void set_restime(SerialCommands* sender) { set_arg(sender, restime); } //!restime
-void set_pidp(SerialCommands* sender) { set_arg(sender, pidP); } //!pidp
-void set_pidi(SerialCommands* sender) { set_arg(sender, pidI); } //!pidi
-void set_pidd(SerialCommands* sender) { set_arg(sender, pidD); } //!pidd
-void set_pidb(SerialCommands* sender) { set_arg(sender, pidB); } //!pidb
+void set_target_temp(SerialCommands* sender) { set_arg(sender, target_temp, ADDR_TARGET_TEMP); } //!targettemp <int>
+void set_sensor(SerialCommands* sender) { set_arg(sender, sensor, ADDR_SENSOR); } //!sensor <int>
+void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference, ADDR_EXTERNAL); } //!external <int>
+void set_pressure_threshold(SerialCommands* sender) { set_arg(sender, filter_threshold, ADDR_THRESHOLD); } //!threshold <int>
+void set_minrpm(SerialCommands* sender) { set_arg(sender, minrpm, ADDR_MINRPM); } //!minrpm <int>
+void set_maxrpm(SerialCommands* sender) { set_arg(sender, maxrpm, ADDR_MAXRPM); } //!maxrpm <int>
+void set_mode(SerialCommands* sender) { set_arg(sender, mode, ADDR_MODE); } //!mode <int>
+void set_ontime(SerialCommands* sender) { set_arg(sender, ontime, ADDR_ONTIME); } //!ontime <int>
+void set_offtime(SerialCommands* sender) { set_arg(sender, offtime, ADDR_OFFTIME); } //!offtime <int>
+void set_restime(SerialCommands* sender) { set_arg(sender, restime, ADDR_RESTIME); } //!restime <int>
+void set_pidp(SerialCommands* sender) { set_arg(sender, pidP, ADDR_PIDP); } //!pidp <int>
+void set_pidi(SerialCommands* sender) { set_arg(sender, pidI, ADDR_PIDI); } //!pidi <int>
+void set_pidd(SerialCommands* sender) { set_arg(sender, pidD, ADDR_PIDD); } //!pidd <int>
+void set_pidb(SerialCommands* sender) { set_arg(sender, pidB, ADDR_PIDB); } //!pidb <int>
 
 //!miner <id> <action>
 void set_miner(SerialCommands* sender) {
@@ -265,6 +267,7 @@ void set_miner(SerialCommands* sender) {
   } else if (action == "deregister") {
     miners[id] = -1;
   }
+  set_EEPROM(ADDR_MINERS + id * sizeof(miners[id]), miners[id]);
 }
 
 //------------------------------------------------------------------------------
@@ -336,7 +339,7 @@ void mock_changes() {
 // TIMER FUNCTIONS //
 //-----------------//
 void main_timer() {
-  mock_changes();
+  //mock_changes();
 
   // blinking green status LED
   digitalWrite(PB0, status);
@@ -443,6 +446,7 @@ void setup() {
   if (EEPROM_is_empty()) {
     Serial.println("Initializing values. This may take a minute or two.");
     init_values();
+    Serial.println("Initialization complete.");
   } else {
     set_EEPROM(ADDR_INIT_MARKER, 1);
     load_values();
