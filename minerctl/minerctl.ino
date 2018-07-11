@@ -1,7 +1,7 @@
 #include <SimpleTimer.h>    // https://github.com/marcelloromani/Arduino-SimpleTimer
 #include <SerialCommands.h> // https://github.com/ppedro74/Arduino-SerialCommands/
 #include <EEPROM.h>
- #include "EEPROMAnything.h"
+#include "EEPROMAnything.h"
 char serial_command_buffer_[64];
 
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\n", " ");
@@ -303,27 +303,26 @@ void init_values() {
     } else {
       miners[i] = 1;
     }
-    Serial.println(i);
     EEPROM_write(ADDR_MINERS + i, miners[i]);
   }
 }
 
 void load_values() {
-  target_temp = EEPROM_readAnything(ADDR_TARGET_TEMP);
-  pidP = EEPROM_readAnything(ADDR_PIDP);
-  pidI = EEPROM_readAnything(ADDR_PIDI);
-  pidD = EEPROM_readAnything(ADDR_PIDD);
-  pidB = EEPROM_readAnything(ADDR_PIDB);
-  minrpm = EEPROM_readAnything(ADDR_MINRPM);
-  maxrpm = EEPROM_readAnything(ADDR_MAXRPM);
+  target_temp = EEPROM_read(ADDR_TARGET_TEMP);
+  pidP = EEPROM_read(ADDR_PIDP);
+  pidI = EEPROM_read(ADDR_PIDI);
+  pidD = EEPROM_read(ADDR_PIDD);
+  pidB = EEPROM_read(ADDR_PIDB);
+  minrpm = EEPROM_read(ADDR_MINRPM);
+  maxrpm = EEPROM_read(ADDR_MAXRPM);
   ontime = EEPROM_readAnything(ADDR_ONTIME);
   offtime = EEPROM_readAnything(ADDR_OFFTIME);
   restime = EEPROM_readAnything(ADDR_RESTIME);
-  sensor = EEPROM_readAnything(ADDR_SENSOR);
+  sensor = EEPROM_read(ADDR_SENSOR);
   filter_threshold = EEPROM_readAnything(ADDR_THRESHOLD);
-  external_reference = EEPROM_readAnything(ADDR_EXTERNAL);
+  external_reference = EEPROM_read(ADDR_EXTERNAL);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
-    miners[i] = EEPROM_readAnything(ADDR_MINERS + i * sizeof(int));
+    miners[i] = EEPROM_read(ADDR_MINERS + i * sizeof(int));
   }
 }
 
@@ -446,7 +445,7 @@ void setup() {
 
   // the following line is only used for testing/debugging. straight-out-of-factory EEPROMs
   // have 255 written all over the memory
-  EEPROM_write(ADDR_INIT_MARKER, 255);
+  // EEPROM_write(ADDR_INIT_MARKER, 255);
   if (EEPROM_is_empty()) {
     Serial.println("Initializing values. This may take a minute or two.");
     init_values();
