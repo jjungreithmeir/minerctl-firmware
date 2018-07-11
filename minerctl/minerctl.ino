@@ -1,7 +1,7 @@
 #include <SimpleTimer.h>    // https://github.com/marcelloromani/Arduino-SimpleTimer
 #include <SerialCommands.h> // https://github.com/ppedro74/Arduino-SerialCommands/
 #include <EEPROM.h>
-
+ #include "EEPROMAnything.h"
 char serial_command_buffer_[64];
 
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\n", " ");
@@ -111,24 +111,7 @@ void set_arg(SerialCommands* sender, int& injectedVar) {
 
 void set_arg(SerialCommands* sender, int& injectedVar, int address) {
   set_arg(sender, injectedVar);
-  set_EEPROM(address, injectedVar);
-}
-
-/*
- * The set method also returns the value to ease the process of syncronization. eg. int var1 = setEEPROM(ADDR, 12345)
- */
-int set_EEPROM(int address, int value) { EEPROM.update(address, value); return value; }
-void set_EEPROM(int address, char *value) { 
-  for(int i=0; i < sizeof(value)/sizeof(char); ++i) {
-    EEPROM.update(address + i * sizeof(char), value[i]);
-  }
-}
-int get_EEPROM(int address) { return EEPROM.read(address); }
-
-void get_EEPROM(int address, char *store) {
-  for (int i = 0; i < sizeof(store)/sizeof(char); ++i) {
-    store[i] = EEPROM.read(address + i * sizeof(char));
-  }
+  EEPROM_writeAnything(address, injectedVar);
 }
 
 /*
@@ -144,7 +127,7 @@ void clear_EEPROM() {
 
 bool EEPROM_is_empty() {
   // TODO remove marker and exchange for crc
-  return get_EEPROM(ADDR_INIT_MARKER) == 255;
+  return EEPROM_read(ADDR_INIT_MARKER) == 255;
 }
 
 // TODO call this somewhere
@@ -226,6 +209,24 @@ void get_miner(SerialCommands* sender) {
   echo(sender, miners[id]);
 }
 
+void get_all(SerialCommands*sender) {
+  echo(sender, String("fw: " + String(fw_version)));
+  echo(sender, String("target_temp: " + String(target_temp)));
+  echo(sender, String("pidp: " + String(pidP) + ", pidi : " + String(pidI) + ", pidd: " + String(pidI) + ", pidb: " + String(pidB)));
+  echo(sender, String("minrpm: " + String(minrpm) + ", maxrpm: " + String(maxrpm)));
+  echo(sender, String("mode: " + String(mode) + ", ontime: " + String(ontime) + ", offtime: " + String(offtime) + ", restime: " + String(restime)));
+  String temp = "";
+  for (int i = 0; i < sizeof(sensor_temps)/sizeof(int); ++i) {
+    temp += i;
+    temp += ":";
+    temp += sensor_temps[i];
+    temp += ", ";
+  }
+  temp.remove(temp.length() - 2); //Removing the last ,_
+  echo(sender, String("sensor_id: " + String(sensor) + ", sensor_temps: " + temp + ", external ref.: " + String(external_reference)));
+  echo(sender, String("filter_threshold: " + String(filter_threshold) + ", pressure: " + String(pressure) + ", filter_status: " + String(filter_ok)));
+}
+
 void set_target_temp(SerialCommands* sender) { set_arg(sender, target_temp, ADDR_TARGET_TEMP); } //!targettemp <int>
 void set_sensor(SerialCommands* sender) { set_arg(sender, sensor, ADDR_SENSOR); } //!sensor <int>
 void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference, ADDR_EXTERNAL); } //!external <int>
@@ -267,7 +268,7 @@ void set_miner(SerialCommands* sender) {
   } else if (action == "deregister") {
     miners[id] = -1;
   }
-  set_EEPROM(ADDR_MINERS + id * sizeof(miners[id]), miners[id]);
+  EEPROM_writeAnything(ADDR_MINERS + id * sizeof(miners[id]), miners[id]);
 }
 
 //------------------------------------------------------------------------------
@@ -281,19 +282,19 @@ void check_filter_status() {
 }
 
 void init_values() {
-  target_temp = set_EEPROM(ADDR_TARGET_TEMP, 50);
-  pidP = set_EEPROM(ADDR_PIDP, 1);
-  pidI = set_EEPROM(ADDR_PIDI, 3);
-  pidD = set_EEPROM(ADDR_PIDD, 4);
-  pidB = set_EEPROM(ADDR_PIDB, 2);
-  minrpm = set_EEPROM(ADDR_MINRPM, 5);
-  maxrpm = set_EEPROM(ADDR_MAXRPM, 80);
-  ontime = set_EEPROM(ADDR_ONTIME, 100);
-  offtime = set_EEPROM(ADDR_OFFTIME, 85);
-  restime = set_EEPROM(ADDR_RESTIME, 125);
-  sensor = set_EEPROM(ADDR_SENSOR, 1);
-  filter_threshold = set_EEPROM(ADDR_THRESHOLD, 1400);
-  external_reference = set_EEPROM(ADDR_EXTERNAL, 55);
+  target_temp = EEPROM_write(ADDR_TARGET_TEMP, 50);
+  pidP = EEPROM_write(ADDR_PIDP, 1);
+  pidI = EEPROM_write(ADDR_PIDI, 3);
+  pidD = EEPROM_write(ADDR_PIDD, 4);
+  pidB = EEPROM_write(ADDR_PIDB, 2);
+  minrpm = EEPROM_write(ADDR_MINRPM, 5);
+  maxrpm = EEPROM_write(ADDR_MAXRPM, 80);
+  ontime = EEPROM_writeAnything(ADDR_ONTIME, 100);
+  offtime = EEPROM_writeAnything(ADDR_OFFTIME, 85);
+  restime = EEPROM_writeAnything(ADDR_RESTIME, 125);
+  sensor = EEPROM_write(ADDR_SENSOR, 1);
+  filter_threshold = EEPROM_writeAnything(ADDR_THRESHOLD, 1400);
+  external_reference = EEPROM_write(ADDR_EXTERNAL, 55);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     if (random(0, 100) < 3) {
       miners[i] = -1;
@@ -302,26 +303,27 @@ void init_values() {
     } else {
       miners[i] = 1;
     }
-    set_EEPROM(ADDR_MINERS + i * sizeof(int), miners[i]);
+    Serial.println(i);
+    EEPROM_write(ADDR_MINERS + i, miners[i]);
   }
 }
 
 void load_values() {
-  target_temp = get_EEPROM(ADDR_TARGET_TEMP);
-  pidP = get_EEPROM(ADDR_PIDP);
-  pidI = get_EEPROM(ADDR_PIDI);
-  pidD = get_EEPROM(ADDR_PIDD);
-  pidB = get_EEPROM(ADDR_PIDB);
-  minrpm = get_EEPROM(ADDR_MINRPM);
-  maxrpm = get_EEPROM(ADDR_MAXRPM);
-  ontime = get_EEPROM(ADDR_ONTIME);
-  offtime = get_EEPROM(ADDR_OFFTIME);
-  restime = get_EEPROM(ADDR_RESTIME);
-  sensor = get_EEPROM(ADDR_SENSOR);
-  filter_threshold = get_EEPROM(ADDR_THRESHOLD);
-  external_reference = get_EEPROM(ADDR_EXTERNAL);
+  target_temp = EEPROM_readAnything(ADDR_TARGET_TEMP);
+  pidP = EEPROM_readAnything(ADDR_PIDP);
+  pidI = EEPROM_readAnything(ADDR_PIDI);
+  pidD = EEPROM_readAnything(ADDR_PIDD);
+  pidB = EEPROM_readAnything(ADDR_PIDB);
+  minrpm = EEPROM_readAnything(ADDR_MINRPM);
+  maxrpm = EEPROM_readAnything(ADDR_MAXRPM);
+  ontime = EEPROM_readAnything(ADDR_ONTIME);
+  offtime = EEPROM_readAnything(ADDR_OFFTIME);
+  restime = EEPROM_readAnything(ADDR_RESTIME);
+  sensor = EEPROM_readAnything(ADDR_SENSOR);
+  filter_threshold = EEPROM_readAnything(ADDR_THRESHOLD);
+  external_reference = EEPROM_readAnything(ADDR_EXTERNAL);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
-    miners[i] = get_EEPROM(ADDR_MINERS + i * sizeof(int));
+    miners[i] = EEPROM_readAnything(ADDR_MINERS + i * sizeof(int));
   }
 }
 
@@ -339,7 +341,7 @@ void mock_changes() {
 // TIMER FUNCTIONS //
 //-----------------//
 void main_timer() {
-  //mock_changes();
+  mock_changes();
 
   // blinking green status LED
   digitalWrite(PB0, status);
@@ -375,6 +377,7 @@ SerialCommand cmd_getrestime("?restime", get_restime);
 SerialCommand cmd_getexternal("?external", get_external_reference);
 SerialCommand cmd_getmode("?mode", get_mode);
 SerialCommand cmd_getminer("?miner", get_miner);
+SerialCommand cmd_getall("?all", get_all);
 SerialCommand cmd_settargettemp("!targettemp", set_target_temp);
 SerialCommand cmd_setexternalreference("!external", set_external_reference);
 SerialCommand cmd_setpressurethreshold("!threshold", set_pressure_threshold);
@@ -411,6 +414,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_getrestime);
   serial_commands_.AddCommand(&cmd_getexternal);
   serial_commands_.AddCommand(&cmd_getmode);
+  serial_commands_.AddCommand(&cmd_getall);
   serial_commands_.AddCommand(&cmd_getminer);
   serial_commands_.AddCommand(&cmd_settargettemp);
   serial_commands_.AddCommand(&cmd_setexternalreference);
@@ -442,16 +446,17 @@ void setup() {
 
   // the following line is only used for testing/debugging. straight-out-of-factory EEPROMs
   // have 255 written all over the memory
-  // set_EEPROM(ADDR_INIT_MARKER, 255);
+  EEPROM_write(ADDR_INIT_MARKER, 255);
   if (EEPROM_is_empty()) {
     Serial.println("Initializing values. This may take a minute or two.");
     init_values();
     Serial.println("Initialization complete.");
   } else {
-    set_EEPROM(ADDR_INIT_MARKER, 1);
     load_values();
   }
-  
+  // mark EEPROm as written
+  EEPROM_write(ADDR_INIT_MARKER, 1);
+
   timer.setInterval(1000, main_timer);
   add_serial_commands();
 }
