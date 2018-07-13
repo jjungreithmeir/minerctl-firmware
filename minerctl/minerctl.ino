@@ -1,3 +1,5 @@
+#define SERIAL_COMMANDS_DEBUG
+
 #include <SimpleTimer.h>    // https://github.com/marcelloromani/Arduino-SimpleTimer
 #include <SerialCommands.h> // https://github.com/ppedro74/Arduino-SerialCommands/
 #include <EEPROM.h>
@@ -36,13 +38,14 @@ bool filter_ok = true;
 bool status = true;
 //------------------------------------------------------------------------------
 
-int addr_marker = -sizeof(int);
+int addr_marker = -1;
 int addr(int offset) { addr_marker += offset; return addr_marker; }
-int addr() { return addr(sizeof(int)); }
+int addr() { return addr(1); }
 
 //------------------//
 // EEPROM ADDRESSES //
 //------------------//
+// 1 byte values
 const int ADDR_INIT_MARKER = addr();
 const int ADDR_TARGET_TEMP = addr();
 const int ADDR_PIDP = addr();
@@ -51,16 +54,18 @@ const int ADDR_PIDD = addr();
 const int ADDR_PIDB = addr();
 const int ADDR_MINRPM = addr();
 const int ADDR_MAXRPM = addr();
-const int ADDR_ONTIME = addr();
-const int ADDR_OFFTIME = addr();
-const int ADDR_RESTIME = addr();
-const int ADDR_SENSOR = addr();
-const int ADDR_THRESHOLD = addr();
 const int ADDR_EXTERNAL = addr();
 const int ADDR_MODE = addr();
-const int ADDR_TEMPS = addr(); //int[4] size = 16 byte
-const int ADDR_VERSION = addr(sizeof(sensor_temps)); //String size = 12 byte
-const int ADDR_MINERS = addr(sizeof(fw_version)); //int[120] size = 480 byte
+// 4 byte values
+const int ADDR_SENSOR = addr();
+const int ADDR_THRESHOLD = addr(sizeof(int));
+const int ADDR_ONTIME = addr(sizeof(int));
+const int ADDR_OFFTIME = addr(sizeof(int));
+const int ADDR_RESTIME = addr(sizeof(int));
+// > 4 byte values
+const int ADDR_TEMPS = addr(sizeof(int)); // int[4] size = 16 byte
+const int ADDR_VERSION = addr(sizeof(sensor_temps)); // String size = 12 byte
+const int ADDR_MINERS = addr(sizeof(fw_version)); // int[120] size = 480 byte
 
 //------------------//
 // HELPER FUNCTIONS //
@@ -88,12 +93,14 @@ bool check_param(SerialCommands* sender, char* param) {
     return_ERR(sender, "no argument given");
     return false;
   }
+  /* TODO reenable
   for (int i = 0; i < sizeof(param)/sizeof(char); ++i) {
     if (!isDigit(param[i]) and param[i] != '\0') { // if no digit and not empty
       return_ERR(sender, "invalid ID given");
       return false;
     } 
   }
+  */
   return true;
 }
 
@@ -103,15 +110,11 @@ bool check_param(SerialCommands* sender, char* param) {
  */
 void set_arg(SerialCommands* sender, int& injectedVar) {
   char* temp = sender->Next();
+  /* TODO reenable
   if (!check_param(sender, temp)) {
     return;
-  }
+  }*/
   injectedVar = atoi(temp);
-}
-
-void set_arg(SerialCommands* sender, int& injectedVar, int address) {
-  set_arg(sender, injectedVar);
-  EEPROM_writeAnything(address, injectedVar);
 }
 
 /*
@@ -227,20 +230,20 @@ void get_all(SerialCommands*sender) {
   echo(sender, String("filter_threshold: " + String(filter_threshold) + ", pressure: " + String(pressure) + ", filter_status: " + String(filter_ok)));
 }
 
-void set_target_temp(SerialCommands* sender) { set_arg(sender, target_temp, ADDR_TARGET_TEMP); } //!targettemp <int>
-void set_sensor(SerialCommands* sender) { set_arg(sender, sensor, ADDR_SENSOR); } //!sensor <int>
-void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference, ADDR_EXTERNAL); } //!external <int>
-void set_pressure_threshold(SerialCommands* sender) { set_arg(sender, filter_threshold, ADDR_THRESHOLD); } //!threshold <int>
-void set_minrpm(SerialCommands* sender) { set_arg(sender, minrpm, ADDR_MINRPM); } //!minrpm <int>
-void set_maxrpm(SerialCommands* sender) { set_arg(sender, maxrpm, ADDR_MAXRPM); } //!maxrpm <int>
-void set_mode(SerialCommands* sender) { set_arg(sender, mode, ADDR_MODE); } //!mode <int>
-void set_ontime(SerialCommands* sender) { set_arg(sender, ontime, ADDR_ONTIME); } //!ontime <int>
-void set_offtime(SerialCommands* sender) { set_arg(sender, offtime, ADDR_OFFTIME); } //!offtime <int>
-void set_restime(SerialCommands* sender) { set_arg(sender, restime, ADDR_RESTIME); } //!restime <int>
-void set_pidp(SerialCommands* sender) { set_arg(sender, pidP, ADDR_PIDP); } //!pidp <int>
-void set_pidi(SerialCommands* sender) { set_arg(sender, pidI, ADDR_PIDI); } //!pidi <int>
-void set_pidd(SerialCommands* sender) { set_arg(sender, pidD, ADDR_PIDD); } //!pidd <int>
-void set_pidb(SerialCommands* sender) { set_arg(sender, pidB, ADDR_PIDB); } //!pidb <int>
+void set_target_temp(SerialCommands* sender) { set_arg(sender, target_temp); } //!targettemp <int>
+void set_sensor(SerialCommands* sender) { set_arg(sender, sensor); } //!sensor <int>
+void set_external_reference(SerialCommands* sender) { set_arg(sender, external_reference); } //!external <int>
+void set_pressure_threshold(SerialCommands* sender) { set_arg(sender, filter_threshold); } //!threshold <int>
+void set_minrpm(SerialCommands* sender) { set_arg(sender, minrpm); } //!minrpm <int>
+void set_maxrpm(SerialCommands* sender) { set_arg(sender, maxrpm); } //!maxrpm <int>
+void set_mode(SerialCommands* sender) { set_arg(sender, mode); } //!mode <int>
+void set_ontime(SerialCommands* sender) { set_arg(sender, ontime); } //!ontime <int>
+void set_offtime(SerialCommands* sender) { set_arg(sender, offtime); } //!offtime <int>
+void set_restime(SerialCommands* sender) { set_arg(sender, restime); } //!restime <int>
+void set_pidp(SerialCommands* sender) { set_arg(sender, pidP); } //!pidp <int>
+void set_pidi(SerialCommands* sender) { set_arg(sender, pidI); } //!pidi <int>
+void set_pidd(SerialCommands* sender) { set_arg(sender, pidD); } //!pidd <int>
+void set_pidb(SerialCommands* sender) { set_arg(sender, pidB); } //!pidb <int>
 
 //!miner <id> <action>
 void set_miner(SerialCommands* sender) {
@@ -268,7 +271,28 @@ void set_miner(SerialCommands* sender) {
   } else if (action == "deregister") {
     miners[id] = -1;
   }
-  EEPROM_writeAnything(ADDR_MINERS + id * sizeof(miners[id]), miners[id]);
+}
+
+//!commit
+void commit_changes(SerialCommands* sender) {
+  EEPROM_write(ADDR_TARGET_TEMP, target_temp);
+  EEPROM_write(ADDR_PIDP, pidP);
+  EEPROM_write(ADDR_PIDI, pidI);
+  EEPROM_write(ADDR_PIDD, pidD);
+  EEPROM_write(ADDR_PIDB, pidB);
+  EEPROM_write(ADDR_MINRPM, minrpm);
+  EEPROM_write(ADDR_MAXRPM, maxrpm);
+  EEPROM_write(ADDR_SENSOR, sensor);
+  EEPROM_write(ADDR_EXTERNAL, external_reference);
+  for (int id = 0; id < sizeof(miners)/sizeof(int); ++id) {
+    EEPROM_write(ADDR_MINERS + id, miners[id]);
+  }
+
+  EEPROM_writeAnything(ADDR_THRESHOLD, filter_threshold);
+  EEPROM_writeAnything(ADDR_ONTIME, ontime);
+  EEPROM_writeAnything(ADDR_OFFTIME, offtime);
+  EEPROM_writeAnything(ADDR_RESTIME, restime);
+  echo(sender, "Changes committed.");
 }
 
 //------------------------------------------------------------------------------
@@ -289,11 +313,7 @@ void init_values() {
   pidB = EEPROM_write(ADDR_PIDB, 2);
   minrpm = EEPROM_write(ADDR_MINRPM, 5);
   maxrpm = EEPROM_write(ADDR_MAXRPM, 80);
-  ontime = EEPROM_writeAnything(ADDR_ONTIME, 100);
-  offtime = EEPROM_writeAnything(ADDR_OFFTIME, 85);
-  restime = EEPROM_writeAnything(ADDR_RESTIME, 125);
   sensor = EEPROM_write(ADDR_SENSOR, 1);
-  filter_threshold = EEPROM_writeAnything(ADDR_THRESHOLD, 1400);
   external_reference = EEPROM_write(ADDR_EXTERNAL, 55);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     if (random(0, 100) < 3) {
@@ -305,6 +325,11 @@ void init_values() {
     }
     EEPROM_write(ADDR_MINERS + i, miners[i]);
   }
+  
+  filter_threshold = EEPROM_writeAnything(ADDR_THRESHOLD, 1400);
+  ontime = EEPROM_writeAnything(ADDR_ONTIME, 100);
+  offtime = EEPROM_writeAnything(ADDR_OFFTIME, 85);
+  restime = EEPROM_writeAnything(ADDR_RESTIME, 125);
 }
 
 void load_values() {
@@ -315,15 +340,15 @@ void load_values() {
   pidB = EEPROM_read(ADDR_PIDB);
   minrpm = EEPROM_read(ADDR_MINRPM);
   maxrpm = EEPROM_read(ADDR_MAXRPM);
-  ontime = EEPROM_readAnything(ADDR_ONTIME);
-  offtime = EEPROM_readAnything(ADDR_OFFTIME);
-  restime = EEPROM_readAnything(ADDR_RESTIME);
   sensor = EEPROM_read(ADDR_SENSOR);
-  filter_threshold = EEPROM_readAnything(ADDR_THRESHOLD);
   external_reference = EEPROM_read(ADDR_EXTERNAL);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     miners[i] = EEPROM_read(ADDR_MINERS + i * sizeof(int));
   }
+  ontime = EEPROM_readAnything(ADDR_ONTIME);
+  offtime = EEPROM_readAnything(ADDR_OFFTIME);
+  restime = EEPROM_readAnything(ADDR_RESTIME);
+  filter_threshold = EEPROM_readAnything(ADDR_THRESHOLD);
 }
 
 void mock_changes() {
@@ -391,6 +416,7 @@ SerialCommand cmd_setpidi("!pidi", set_pidi);
 SerialCommand cmd_setpidd("!pidd", set_pidd);
 SerialCommand cmd_setpidb("!pidb", set_pidb);
 SerialCommand cmd_setminer("!miner", set_miner);
+SerialCommand cmd_commit("!commit", commit_changes);
 
 void add_serial_commands() {
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
@@ -429,6 +455,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_setpidd);
   serial_commands_.AddCommand(&cmd_setpidb);
   serial_commands_.AddCommand(&cmd_setminer);
+  serial_commands_.AddCommand(&cmd_commit);
 }
 
 //------------------------------------------------------------------------------
@@ -441,7 +468,7 @@ void setup() {
   pinMode(PB7, OUTPUT);
   pinMode(PB14, OUTPUT);
   
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // the following line is only used for testing/debugging. straight-out-of-factory EEPROMs
   // have 255 written all over the memory
@@ -456,7 +483,7 @@ void setup() {
   // mark EEPROm as written
   EEPROM_write(ADDR_INIT_MARKER, 1);
 
-  timer.setInterval(1000, main_timer);
+  timer.setInterval(500, main_timer);
   add_serial_commands();
 }
 
@@ -464,3 +491,4 @@ void loop() {
   serial_commands_.ReadSerial();
   timer.run();
 }
+
