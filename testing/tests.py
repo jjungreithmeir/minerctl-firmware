@@ -6,13 +6,13 @@ import random
 SERIAL = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 
 def _read(cmd):
-    resp_len = _write(cmd)
-    return SERIAL.read(resp_len).decode('utf-8').strip()
+    _write(cmd)
+    while not SERIAL.in_waiting:
+        time.sleep(.1)
+    return SERIAL.read(SERIAL.in_waiting).decode('utf-8').strip()
 
 def _write(cmd):
     resp_len = SERIAL.write(bytes(cmd + '\n', encoding='utf-8'))
-    SERIAL.flushInput()
-    SERIAL.flushOutput()
     return resp_len
 
 def _is_int(s):
@@ -111,3 +111,6 @@ def test_miner():
     action = random.choice(list(actions))
     _write("!miner {} {}".format(rand_id, action))
     assert _read("?miner {}".format(rand_id)) == str(actions[action])
+
+def test_commit():
+    assert _read("!commit") == "Changes committed."
