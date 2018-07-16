@@ -179,7 +179,7 @@ void get_rpm(SerialCommands* sender) { echo(sender, rpm); } //?rpm
 void get_ontime(SerialCommands* sender) { echo(sender, ontime); } //?ontime
 void get_offtime(SerialCommands* sender) { echo(sender, offtime); } //?offtime
 void get_restime(SerialCommands* sender) { echo(sender, restime); } //?restime
-void get_external_reference(SerialCommands* sender) { echo(sender, restime); } //?external
+void get_external_reference(SerialCommands* sender) { echo(sender, external_reference); } //?external
 void get_mode(SerialCommands* sender) { echo(sender, mode); } //?mode
 
 //?temps
@@ -274,6 +274,9 @@ void set_miner(SerialCommands* sender) {
 }
 
 //!commit
+/*
+ * https://stackoverflow.com/questions/51302313/reading-serial-commands-takes-too-much-time
+ */
 void commit_changes(SerialCommands* sender) {
   EEPROM_write(ADDR_TARGET_TEMP, target_temp);
   EEPROM_write(ADDR_PIDP, pidP);
@@ -416,6 +419,7 @@ SerialCommand cmd_setpidi("!pidi", set_pidi);
 SerialCommand cmd_setpidd("!pidd", set_pidd);
 SerialCommand cmd_setpidb("!pidb", set_pidb);
 SerialCommand cmd_setminer("!miner", set_miner);
+SerialCommand cmd_setsensor("!sensor", set_sensor);
 SerialCommand cmd_commit("!commit", commit_changes);
 
 void add_serial_commands() {
@@ -455,6 +459,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_setpidd);
   serial_commands_.AddCommand(&cmd_setpidb);
   serial_commands_.AddCommand(&cmd_setminer);
+  serial_commands_.AddCommand(&cmd_setsensor);
   serial_commands_.AddCommand(&cmd_commit);
 }
 
