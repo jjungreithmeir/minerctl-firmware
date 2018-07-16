@@ -154,6 +154,10 @@ unsigned long eeprom_crc(void) {
   return crc;
 }
 
+void save_crc(void) {
+  EEPROM_writeAnything(ADDR_END, eeprom_crc());
+}
+
 // Prints the variable to the senders serial interface
 void echo(SerialCommands* sender, int var) { sender->GetSerial()->println(var); }
 void echo(SerialCommands* sender, String var) { sender->GetSerial()->println(var); }
@@ -280,6 +284,14 @@ void set_miner(SerialCommands* sender) {
  * https://stackoverflow.com/questions/51302313/reading-serial-commands-takes-too-much-time
  */
 void commit_changes(SerialCommands* sender) {
+  // Turning on all LEDs for writing
+  int state1 = digitalRead(PB0);
+  int state2 = digitalRead(PB7);
+  int state3 = digitalRead(PB14);
+  digitalWrite(PB0, HIGH);
+  digitalWrite(PB7, HIGH);
+  digitalWrite(PB14, HIGH);
+
   EEPROM_write(ADDR_TARGET_TEMP, target_temp);
   EEPROM_write(ADDR_PIDP, pidP);
   EEPROM_write(ADDR_PIDI, pidI);
@@ -297,6 +309,12 @@ void commit_changes(SerialCommands* sender) {
   EEPROM_writeAnything(ADDR_ONTIME, ontime);
   EEPROM_writeAnything(ADDR_OFFTIME, offtime);
   EEPROM_writeAnything(ADDR_RESTIME, restime);
+
+  save_crc();
+
+  digitalWrite(PB0, state1);
+  digitalWrite(PB7, state2);
+  digitalWrite(PB14, state3);
   echo(sender, "Changes committed.");
 }
 
@@ -486,8 +504,7 @@ void setup() {
   } else {
     load_values();
   }
-
-  EEPROM_writeAnything(ADDR_END, eeprom_crc());
+  save_crc();
   timer.setInterval(500, main_timer);
   add_serial_commands();
 }
