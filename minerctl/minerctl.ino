@@ -66,7 +66,7 @@ const int ADDR_RESTIME = addr(sizeof(int));
 const int ADDR_TEMPS = addr(sizeof(int)); // int[4] size = 16 byte
 const int ADDR_VERSION = addr(sizeof(sensor_temps)); // String size = 12 byte
 const int ADDR_MINERS = addr(sizeof(fw_version)); // int[120] size = 480 byte
-
+const int ADDR_END = 1024;
 //------------------//
 // HELPER FUNCTIONS //
 //------------------//
@@ -129,8 +129,9 @@ void clear_EEPROM() {
 }
 
 bool EEPROM_is_empty() {
-  // TODO remove marker and exchange for crc
-  return EEPROM_read(ADDR_INIT_MARKER) == 255;
+  unsigned long saved = EEPROM_readAnything(ADDR_END);
+  unsigned long calculated = eeprom_crc();
+  return !(saved == calculated);
 }
 
 // TODO call this somewhere
@@ -143,9 +144,9 @@ unsigned long eeprom_crc(void) {
     0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
   };
 
+  // Only checking the first kB, as the EEPROM is way too big to be checked entirely in a sensible time frame. 
   unsigned long crc = ~0L;
-
-  for (int index = 0 ; index < EEPROM.length()  ; ++index) {
+  for (int index = 0 ; index < ADDR_END; ++index) {
     crc = crc_table[(crc ^ EEPROM[index]) & 0x0f] ^ (crc >> 4);
     crc = crc_table[(crc ^ (EEPROM[index] >> 4)) & 0x0f] ^ (crc >> 4);
     crc = ~crc;
@@ -181,6 +182,7 @@ void get_offtime(SerialCommands* sender) { echo(sender, offtime); } //?offtime
 void get_restime(SerialCommands* sender) { echo(sender, restime); } //?restime
 void get_external_reference(SerialCommands* sender) { echo(sender, external_reference); } //?external
 void get_mode(SerialCommands* sender) { echo(sender, mode); } //?mode
+void get_crc(SerialCommands* sender) { echo(sender, eeprom_crc()); } //?ctc
 
 //?temps
 void get_temps(SerialCommands* sender) {
@@ -405,6 +407,7 @@ SerialCommand cmd_getexternal("?external", get_external_reference);
 SerialCommand cmd_getmode("?mode", get_mode);
 SerialCommand cmd_getminer("?miner", get_miner);
 SerialCommand cmd_getall("?all", get_all);
+SerialCommand cmd_getcrc("?crc", get_crc);
 SerialCommand cmd_settargettemp("!targettemp", set_target_temp);
 SerialCommand cmd_setexternalreference("!external", set_external_reference);
 SerialCommand cmd_setpressurethreshold("!threshold", set_pressure_threshold);
@@ -444,6 +447,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_getexternal);
   serial_commands_.AddCommand(&cmd_getmode);
   serial_commands_.AddCommand(&cmd_getall);
+  serial_commands_.AddCommand(&cmd_getcrc);
   serial_commands_.AddCommand(&cmd_getminer);
   serial_commands_.AddCommand(&cmd_settargettemp);
   serial_commands_.AddCommand(&cmd_setexternalreference);
@@ -475,9 +479,6 @@ void setup() {
   
   Serial.begin(115200);
 
-  // the following line is only used for testing/debugging. straight-out-of-factory EEPROMs
-  // have 255 written all over the memory
-  // EEPROM_write(ADDR_INIT_MARKER, 255);
   if (EEPROM_is_empty()) {
     Serial.println("Initializing values. This may take a minute or two.");
     init_values();
@@ -485,9 +486,8 @@ void setup() {
   } else {
     load_values();
   }
-  // mark EEPROm as written
-  EEPROM_write(ADDR_INIT_MARKER, 1);
 
+  EEPROM_writeAnything(ADDR_END, eeprom_crc());
   timer.setInterval(500, main_timer);
   add_serial_commands();
 }
