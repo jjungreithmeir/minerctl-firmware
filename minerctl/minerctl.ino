@@ -283,22 +283,14 @@ void set_miner(SerialCommands* sender) {
   // TODO invalid argument given
 
   int id = raw_id.toInt();
-  String action = String(sender->Next());
-  if (action == NULL) {
-    return_ERR(sender, "no argument given");
-    return;
-  } 
-  if (action != "on" and action != "off" and action != "register" and action != "deregister") {
+  int action = atoi(sender->Next());
+
+  if (action < -1 and action > 1) {
     return_ERR(sender, "invalid argument given");
     return;
   }
-  if (action == "on" or action =="register") {
-    miners[id] = 1;
-  } else if (action == "off") {
-    miners[id] = 0;
-  } else if (action == "deregister") {
-    miners[id] = -1;
-  }
+  // 1 = on or register, 0 = off, -1 = deregister
+  miners[id] = action;
 }
 
 //!commit
