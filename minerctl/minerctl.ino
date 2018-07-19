@@ -49,6 +49,7 @@ int rpm_output = 0;
 
 AutoPID myPID(&sensor_temps[sensor], &target_temp, &rpm_output, OUTPUT_MIN, OUTPUT_MAX, pidP, pidI, pidD);
 
+// Starting at -1, as the first call to addr() will advance the marker
 int addr_marker = -1;
 int addr(int offset) { addr_marker += offset; return addr_marker; }
 int addr() { return addr(1); }
@@ -239,7 +240,16 @@ void get_miner(SerialCommands* sender) {
   }
   echo(sender, miners[id]);
 }
-
+//?miners
+void get_miners(SerialCommands* sender) {
+  String resp = "";
+  for (int i = 0; i < MAX_MINERS; ++i) {
+    resp += miners[i];
+    resp += ", "; 
+  }
+  resp.remove(resp.length() - 2); //Removing the last ,_
+  echo(sender, resp);
+}
 void get_all(SerialCommands*sender) {
   echo(sender, String("fw: " + String(fw_version)));
   echo(sender, String("target_temp: " + String(target_temp)));
@@ -289,7 +299,7 @@ void set_miner(SerialCommands* sender) {
     return_ERR(sender, "invalid argument given");
     return;
   }
-  // 1 = on or register, 0 = off, -1 = deregister
+  // 1 = on or register, 0 = off, 255 = deregister
   miners[id] = action;
 }
 
@@ -482,6 +492,7 @@ SerialCommand cmd_getrestime("?restime", get_restime);
 SerialCommand cmd_getexternal("?external", get_external_reference);
 SerialCommand cmd_getmode("?mode", get_mode);
 SerialCommand cmd_getminer("?miner", get_miner);
+SerialCommand cmd_getminers("?miners", get_miners);
 SerialCommand cmd_getall("?all", get_all);
 SerialCommand cmd_getcrc("?crc", get_crc);
 SerialCommand cmd_getmaxminers("?maxminers", get_maxminers);
@@ -545,6 +556,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_setsensor);
   serial_commands_.AddCommand(&cmd_commit);
   serial_commands_.AddCommand(&cmd_reset);
+  serial_commands_.AddCommand(&cmd_getminers);
 }
 
 //------------------------------------------------------------------------------
