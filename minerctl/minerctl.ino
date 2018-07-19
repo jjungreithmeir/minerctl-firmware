@@ -1,4 +1,7 @@
-#define SERIAL_COMMANDS_DEBUG
+// Add the following line to enter the (verbose) debug mode.
+// Be warned that it will most likely break any connected backends
+// as they will receive unexpected messages through the serial interface
+// #define SERIAL_COMMANDS_DEBUG
 
 #include <SimpleTimer.h>    // https://github.com/marcelloromani/Arduino-SimpleTimer
 #include <SerialCommands.h> // https://github.com/ppedro74/Arduino-SerialCommands/
@@ -7,6 +10,7 @@
 #include "EEPROMAnything.h"
 char serial_command_buffer_[64];
 
+// '\n' is the line termination command for this serial interface
 SerialCommands serial_commands_(&Serial, serial_command_buffer_, sizeof(serial_command_buffer_), "\n", " ");
 
 SimpleTimer timer;
@@ -34,19 +38,17 @@ int pressure;                   //value in mBar of pressure difference
 int external_reference;
 int mode;                       //0 = gpu, 1 = asic
 const int MAX_MINERS = 120;
-int miners[MAX_MINERS];             //-1 = disabled/not present, 0 = off, 1 = on
+int miners[MAX_MINERS];         //255 = disabled/not present, 0 = off, 1 = on
 bool filter_ok = true;
 bool status = true;
 //------------------------------------------------------------------------------
 
-// TODO remove, only used for PWM testing
+// Can be removed, only used for PWM testing
 int blink_row = 0;
 
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-
 int rpm_output = 0;
-
 AutoPID myPID(&sensor_temps[sensor], &target_temp, &rpm_output, OUTPUT_MIN, OUTPUT_MAX, pidP, pidI, pidD);
 
 // Starting at -1, as the first call to addr() will advance the marker
@@ -97,7 +99,7 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd) {
 }
 
 /*
- * Checks whether the param is NULL, empty or a non-digit.
+ * Checks whether the param is NULL
  * Returns true if a valid number is given.
  */
 bool check_param(SerialCommands* sender, char* param) {
@@ -105,14 +107,6 @@ bool check_param(SerialCommands* sender, char* param) {
     return_ERR(sender, "no argument given");
     return false;
   }
-  /* TODO reenable
-  for (int i = 0; i < sizeof(param)/sizeof(char); ++i) {
-    if (!isDigit(param[i]) and param[i] != '\0') { // if no digit and not empty
-      return_ERR(sender, "invalid ID given");
-      return false;
-    } 
-  }
-  */
   return true;
 }
 
@@ -122,16 +116,18 @@ bool check_param(SerialCommands* sender, char* param) {
  */
 void set_arg(SerialCommands* sender, int& injectedVar) {
   char* temp = sender->Next();
-  /* TODO reenable
   if (!check_param(sender, temp)) {
     return;
-  }*/
+  }
   injectedVar = atoi(temp);
 }
 
 /*
  * Theoretically this clears the EEPROM, but I recommend against executing this because it is
- * incredibly slow and it hurts the lifetime of the flash memory of the nucleo board (as it has no real EEPROM)
+ * incredibly slow and it hurts the lifetime of the flash memory of the nucleo board (as it has no real EEPROM).
+ * If you ever want to reset the EEPROM for testing, I recommend to !commit and then to reset the board after
+ * a few seconds. The mismatching CRC value will cause the program to reinitialize the configuration and write
+ * it to the EEPROM.
  */
 void clear_EEPROM() {
   for (int i = 0 ; i < EEPROM.length() ; ++i) {
@@ -142,9 +138,9 @@ void clear_EEPROM() {
 
 bool EEPROM_is_empty() {
   unsigned long saved = EEPROM_readAnything(ADDR_END);
-  unsigned long calculated = eeprom_crc();
+  unsigned long calculated = EEPROM_crc();
 
-  #ifdef DEBUG
+  #ifdef SERIAL_COMMANDS_DEBUG
   Serial.print("saved: ");
   Serial.print(saved);
   Serial.print(", calc: ");
@@ -156,7 +152,11 @@ bool EEPROM_is_empty() {
   return !(saved == calculated);
 }
 
-unsigned long eeprom_crc(void) {
+/*
+ * Performs a basic CRC check up until the ADDR_END (currently 1kB).
+ * source: https://www.arduino.cc/en/Tutorial/EEPROMCrc 
+ */
+unsigned long EEPROM_crc(void) {
 
   const unsigned long crc_table[16] = {
     0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
@@ -165,7 +165,6 @@ unsigned long eeprom_crc(void) {
     0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
   };
 
-  // Only checking the first kB, as the EEPROM is way too big to be checked entirely in a sensible time frame. 
   unsigned long crc = ~0L;
   for (int index = 0 ; index < ADDR_END; ++index) {
     crc = crc_table[(crc ^ EEPROM[index]) & 0x0f] ^ (crc >> 4);
@@ -176,10 +175,10 @@ unsigned long eeprom_crc(void) {
 }
 
 void save_crc(void) {
-  EEPROM_writeAnything(ADDR_END, eeprom_crc());
+  EEPROM_writeAnything(ADDR_END, EEPROM_crc());
 }
 
-// Prints the variable to the senders serial interface
+/* Prints the variable to the senders serial interface */
 void echo(SerialCommands* sender, int var) { sender->GetSerial()->println(var); }
 void echo(SerialCommands* sender, String var) { sender->GetSerial()->println(var); }
 
@@ -209,7 +208,7 @@ void get_offtime(SerialCommands* sender) { echo(sender, offtime); } //?offtime
 void get_restime(SerialCommands* sender) { echo(sender, restime); } //?restime
 void get_external_reference(SerialCommands* sender) { echo(sender, external_reference); } //?external
 void get_mode(SerialCommands* sender) { echo(sender, mode); } //?mode
-void get_crc(SerialCommands* sender) { echo(sender, eeprom_crc()); } //?ctc
+void get_crc(SerialCommands* sender) { echo(sender, EEPROM_crc()); } //?ctc
 void get_maxminers(SerialCommands* sender) { echo(sender, MAX_MINERS); } //?maxminers
 //?temps
 void get_temps(SerialCommands* sender) {
@@ -231,8 +230,6 @@ void get_miner(SerialCommands* sender) {
     return_ERR(sender, "no argument given");
     return;
   }
-  // TODO invalid argument given
-
   int id = raw_id.toInt();
   if (id < 0 or id >= MAX_MINERS) {
     return_ERR(sender, "invalid ID given");
@@ -241,6 +238,10 @@ void get_miner(SerialCommands* sender) {
   echo(sender, miners[id]);
 }
 //?miners
+/**
+ * Gets states of all miners as a ',_' separated string. This is very useful to increase the performance in case you need more
+ * than a few miner states.
+ */
 void get_miners(SerialCommands* sender) {
   String resp = "";
   for (int i = 0; i < MAX_MINERS; ++i) {
@@ -250,6 +251,10 @@ void get_miners(SerialCommands* sender) {
   resp.remove(resp.length() - 2); //Removing the last ,_
   echo(sender, resp);
 }
+// ?all
+/**
+ * Returns all sensor values and configurations.
+ */
 void get_all(SerialCommands*sender) {
   echo(sender, String("fw: " + String(fw_version)));
   echo(sender, String("target_temp: " + String(target_temp)));
@@ -290,8 +295,6 @@ void set_miner(SerialCommands* sender) {
     return_ERR(sender, "no argument given");
     return;
   }
-  // TODO invalid argument given
-
   int id = raw_id.toInt();
   int action = atoi(sender->Next());
 
@@ -305,10 +308,16 @@ void set_miner(SerialCommands* sender) {
 
 //!commit
 /*
+ * In order to persist changes across restarts, the configuration needs to be written to the EEPROM.
+ * As saving them with every value would take up too much time, the write process is centralized in
+ * this function/command. For more information regarding this design decision view the following
+ * stackoverflow question (asked & answered by me):
+ * 
  * https://stackoverflow.com/questions/51302313/reading-serial-commands-takes-too-much-time
  */
 void commit_changes(SerialCommands* sender) {
-  // Turning on all LEDs for writing
+  // Lighting up all onboard LEDs to show the commit process
+  // This can be safely removed in the final version
   int state1 = digitalRead(PB0);
   int state2 = digitalRead(PB7);
   int state3 = digitalRead(PB14);
@@ -339,6 +348,8 @@ void commit_changes(SerialCommands* sender) {
   digitalWrite(PB0, state1);
   digitalWrite(PB7, state2);
   digitalWrite(PB14, state3);
+  // DO NOT REMOVE this echo, it acts as a handle for the backend to notice the end of
+  // writing process.
   echo(sender, "Changes committed.");
 }
 
@@ -351,6 +362,7 @@ void reset(SerialCommands* sender) { resetFunc(); } //!reset
 //-------------------//
 
 void setup_PID(void) {
+  // Converting relative to absolute 1 byte values
   int minrpm_rel = (minrpm * 255)/100;
   int maxrpm_rel = (maxrpm * 255)/100;
   myPID.setBangBang(minrpm_rel, maxrpm_rel);
@@ -362,6 +374,9 @@ void check_filter_status(void) {
   filter_ok = pressure < filter_threshold;
 }
 
+/**
+ * Initializes basic values. Is currently called in case the EEPROM is corrupted (crc does not match).
+ */
 void init_values(void) {
   target_temp = EEPROM_write(ADDR_TARGET_TEMP, 35);
   pidP = EEPROM_write(ADDR_PIDP, 6);
@@ -408,7 +423,11 @@ void load_values(void) {
   filter_threshold = EEPROM_readAnything(ADDR_THRESHOLD);
 }
 
-void mock_changes(void) {
+/**
+ * TODO @georg
+ * Update all sensor values in here.
+ */
+void update_sensors(void) {
   rpm = random(minrpm + 10, maxrpm - 10);
   pressure = random(1200, 1500);
   for (int i = 0; i < sizeof(sensor_temps)/sizeof(int); ++i) {
@@ -422,7 +441,7 @@ void mock_changes(void) {
 // TIMER FUNCTIONS //
 //-----------------//
 void main_timer() {
-  mock_changes();
+  update_sensors();
 
   // blinking green status LED
   digitalWrite(PB0, status);
@@ -451,7 +470,7 @@ void main_timer() {
 
   myPID.run();
 
-  #ifdef DEBUG
+  #ifdef SERIAL_COMMANDS_DEBUG
   Serial.print("temperature: ");
   Serial.print(sensor_temps[sensor]);
   Serial.print(", target temp: ");
