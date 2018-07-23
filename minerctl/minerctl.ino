@@ -336,8 +336,9 @@ void commit_changes(SerialCommands* sender) {
   EEPROM_write(ADDR_MAXRPM, maxrpm);
   EEPROM_write(ADDR_SENSOR, sensor);
   EEPROM_write(ADDR_FREQUENCY, commit_frequency);
+  EEPROM_write(ADDR_MODE, mode);
   EEPROM_write(ADDR_EXTERNAL, external_reference);
-  for (int id = 0; id < sizeof(miners)/sizeof(int); ++id) {
+  for (int id = 0; id < MAX_MINERS; ++id) {
     EEPROM_write(ADDR_MINERS + id, miners[id]);
   }
 
@@ -387,16 +388,11 @@ void init_values(void) {
   minrpm = EEPROM_write(ADDR_MINRPM, 5);
   maxrpm = EEPROM_write(ADDR_MAXRPM, 80);
   sensor = EEPROM_write(ADDR_SENSOR, 1);
+  mode = EEPROM_write(ADDR_MODE, 0);
   commit_frequency = EEPROM_write(ADDR_FREQUENCY, 12);
   external_reference = EEPROM_write(ADDR_EXTERNAL, 55);
-  for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
-    if (random(0, 100) < 3) {
-      miners[i] = -1;
-    } else if (random(0, 100) < 10) {
-      miners[i] = 0;
-    } else {
-      miners[i] = 1;
-    }
+  for (int i = 0; i < MAX_MINERS; ++i) {
+    miners[i] = 1;
     EEPROM_write(ADDR_MINERS + i, miners[i]);
   }
   
@@ -415,10 +411,11 @@ void load_values(void) {
   minrpm = EEPROM_read(ADDR_MINRPM);
   maxrpm = EEPROM_read(ADDR_MAXRPM);
   sensor = EEPROM_read(ADDR_SENSOR);
+  mode = EEPROM_read(ADDR_MODE);
   external_reference = EEPROM_read(ADDR_EXTERNAL);
   commit_frequency = EEPROM_read(ADDR_FREQUENCY);
-  for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
-    miners[i] = EEPROM_read(ADDR_MINERS + i * sizeof(int));
+  for (int i = 0; i < MAX_MINERS; ++i) {
+    miners[i] = EEPROM_read(ADDR_MINERS + i);
   }
   ontime = EEPROM_readAnything(ADDR_ONTIME);
   offtime = EEPROM_readAnything(ADDR_OFFTIME);
