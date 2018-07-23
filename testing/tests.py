@@ -95,6 +95,11 @@ def test_sensor():
     _write("!sensor {}".format(val))
     assert _read("?sensor") == val
 
+def test_frequency():
+    val = str(random.randint(0, 36))
+    _write("!frequency {}".format(val))
+    assert _read("?frequency") == val
+
 def test_filter():
     filter_status = _read("?filter")
     assert _is_int(filter_status) and (filter_status in ("0", "1"))

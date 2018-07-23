@@ -37,6 +37,7 @@ int sensor_temps[4];  //values in °C
 int pressure;                   //value in mBar of pressure difference
 int external_reference;
 int mode;                       //0 = gpu, 1 = asic
+int commit_frequency;
 const int MAX_MINERS = 120;
 int miners[MAX_MINERS];         //255 = disabled/not present, 0 = off, 1 = on
 bool filter_ok = true;
@@ -70,6 +71,7 @@ const int ADDR_MINRPM = addr();
 const int ADDR_MAXRPM = addr();
 const int ADDR_EXTERNAL = addr();
 const int ADDR_MODE = addr();
+const int ADDR_FREQUENCY = addr();
 // 4 byte values
 const int ADDR_SENSOR = addr();
 const int ADDR_THRESHOLD = addr(sizeof(int));
@@ -182,8 +184,6 @@ void save_crc(void) {
 void echo(SerialCommands* sender, int var) { sender->GetSerial()->println(var); }
 void echo(SerialCommands* sender, String var) { sender->GetSerial()->println(var); }
 
-void(* resetFunc) (void) = 0;
-
 //------------------------------------------------------------------------------
 
 //----------------------------//
@@ -210,6 +210,7 @@ void get_external_reference(SerialCommands* sender) { echo(sender, external_refe
 void get_mode(SerialCommands* sender) { echo(sender, mode); } //?mode
 void get_crc(SerialCommands* sender) { echo(sender, EEPROM_crc()); } //?ctc
 void get_maxminers(SerialCommands* sender) { echo(sender, MAX_MINERS); } //?maxminers
+void get_frequency(SerialCommands* sender) { echo(sender, commit_frequency); } //?frequency
 //?temps
 void get_temps(SerialCommands* sender) {
   String temp = "";
@@ -287,6 +288,7 @@ void set_pidp(SerialCommands* sender) { set_arg(sender, pidP); setup_PID(); } //
 void set_pidi(SerialCommands* sender) { set_arg(sender, pidI); setup_PID(); } //!pidi <int>
 void set_pidd(SerialCommands* sender) { set_arg(sender, pidD); setup_PID(); } //!pidd <int>
 void set_pidb(SerialCommands* sender) { set_arg(sender, pidB); setup_PID(); } //!pidb <int>
+void set_frequency(SerialCommands* sender) { set_arg(sender, commit_frequency); } //!frequency <int>
 
 //!miner <id> <action>
 void set_miner(SerialCommands* sender) {
@@ -333,6 +335,7 @@ void commit_changes(SerialCommands* sender) {
   EEPROM_write(ADDR_MINRPM, minrpm);
   EEPROM_write(ADDR_MAXRPM, maxrpm);
   EEPROM_write(ADDR_SENSOR, sensor);
+  EEPROM_write(ADDR_FREQUENCY, commit_frequency);
   EEPROM_write(ADDR_EXTERNAL, external_reference);
   for (int id = 0; id < sizeof(miners)/sizeof(int); ++id) {
     EEPROM_write(ADDR_MINERS + id, miners[id]);
@@ -352,8 +355,6 @@ void commit_changes(SerialCommands* sender) {
   // writing process.
   echo(sender, "Changes committed.");
 }
-
-void reset(SerialCommands* sender) { resetFunc(); } //!reset
 
 //------------------------------------------------------------------------------
 
@@ -386,6 +387,7 @@ void init_values(void) {
   minrpm = EEPROM_write(ADDR_MINRPM, 5);
   maxrpm = EEPROM_write(ADDR_MAXRPM, 80);
   sensor = EEPROM_write(ADDR_SENSOR, 1);
+  commit_frequency = EEPROM_write(ADDR_FREQUENCY, 12);
   external_reference = EEPROM_write(ADDR_EXTERNAL, 55);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     if (random(0, 100) < 3) {
@@ -414,6 +416,7 @@ void load_values(void) {
   maxrpm = EEPROM_read(ADDR_MAXRPM);
   sensor = EEPROM_read(ADDR_SENSOR);
   external_reference = EEPROM_read(ADDR_EXTERNAL);
+  commit_frequency = EEPROM_read(ADDR_FREQUENCY);
   for (int i = 0; i < sizeof(miners)/sizeof(int); ++i) {
     miners[i] = EEPROM_read(ADDR_MINERS + i * sizeof(int));
   }
@@ -515,6 +518,7 @@ SerialCommand cmd_getminers("?miners", get_miners);
 SerialCommand cmd_getall("?all", get_all);
 SerialCommand cmd_getcrc("?crc", get_crc);
 SerialCommand cmd_getmaxminers("?maxminers", get_maxminers);
+SerialCommand cmd_getfrequency("?frequency", get_frequency);
 SerialCommand cmd_settargettemp("!targettemp", set_target_temp);
 SerialCommand cmd_setexternalreference("!external", set_external_reference);
 SerialCommand cmd_setpressurethreshold("!threshold", set_pressure_threshold);
@@ -530,8 +534,8 @@ SerialCommand cmd_setpidd("!pidd", set_pidd);
 SerialCommand cmd_setpidb("!pidb", set_pidb);
 SerialCommand cmd_setminer("!miner", set_miner);
 SerialCommand cmd_setsensor("!sensor", set_sensor);
+SerialCommand cmd_setfrequency("!frequency", set_frequency);
 SerialCommand cmd_commit("!commit", commit_changes);
-SerialCommand cmd_reset("!reset", reset);
 
 void add_serial_commands() {
   serial_commands_.SetDefaultHandler(cmd_unrecognized);
@@ -558,6 +562,7 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_getcrc);
   serial_commands_.AddCommand(&cmd_getminer);
   serial_commands_.AddCommand(&cmd_getmaxminers);
+  serial_commands_.AddCommand(&cmd_getfrequency);
   serial_commands_.AddCommand(&cmd_settargettemp);
   serial_commands_.AddCommand(&cmd_setexternalreference);
   serial_commands_.AddCommand(&cmd_setpressurethreshold);
@@ -574,8 +579,8 @@ void add_serial_commands() {
   serial_commands_.AddCommand(&cmd_setminer);
   serial_commands_.AddCommand(&cmd_setsensor);
   serial_commands_.AddCommand(&cmd_commit);
-  serial_commands_.AddCommand(&cmd_reset);
   serial_commands_.AddCommand(&cmd_getminers);
+  serial_commands_.AddCommand(&cmd_setfrequency);
 }
 
 //------------------------------------------------------------------------------
