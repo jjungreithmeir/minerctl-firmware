@@ -112,10 +112,9 @@ def test_pressure():
 
 def test_miner():
     rand_id = str(random.randint(0, 119))
-    actions = {"deregister": -1, "register": 1, "on": 1, "off": 0}
-    action = random.choice(list(actions))
+    action = random.choice([255, 0, 1])
     _write("!miner {} {}".format(rand_id, action))
-    assert _read("?miner {}".format(rand_id)) == str(actions[action])
+    assert int(_read("?miner {}".format(rand_id))) == action
 
 def test_commit():
     assert _read("!commit") == "Changes committed."
