@@ -42,6 +42,8 @@ const int MAX_MINERS = 120;
 int miners[MAX_MINERS];         //255 = disabled/not present, 0 = off, 1 = on
 bool filter_ok = true;
 bool status = true;
+
+int timer_id;
 //------------------------------------------------------------------------------
 
 // Can be removed, only used for PWM testing
@@ -288,7 +290,15 @@ void set_pidp(SerialCommands* sender) { set_arg(sender, pidP); setup_PID(); } //
 void set_pidi(SerialCommands* sender) { set_arg(sender, pidI); setup_PID(); } //!pidi <int>
 void set_pidd(SerialCommands* sender) { set_arg(sender, pidD); setup_PID(); } //!pidd <int>
 void set_pidb(SerialCommands* sender) { set_arg(sender, pidB); setup_PID(); } //!pidb <int>
-void set_frequency(SerialCommands* sender) { set_arg(sender, commit_frequency); } //!frequency <int>
+void set_frequency(SerialCommands* sender) { 
+  int old_frequency = commit_frequency;
+  set_arg(sender, commit_frequency); 
+  // if the frequency value has been updated, remove the old timer and set a new one.
+  if (old_frequency != commit_frequency) {
+    timer.deleteTimer(timer_id);
+    timer_id = timer.setInterval(1000 * 60 * 60 * commit_frequency, auto_commit);
+  }
+} //!frequency <int>
 
 //!miner <id> <action>
 void set_miner(SerialCommands* sender) {
@@ -308,16 +318,7 @@ void set_miner(SerialCommands* sender) {
   miners[id] = action;
 }
 
-//!commit
-/*
- * In order to persist changes across restarts, the configuration needs to be written to the EEPROM.
- * As saving them with every value would take up too much time, the write process is centralized in
- * this function/command. For more information regarding this design decision view the following
- * stackoverflow question (asked & answered by me):
- * 
- * https://stackoverflow.com/questions/51302313/reading-serial-commands-takes-too-much-time
- */
-void commit_changes(SerialCommands* sender) {
+void _commit() {
   // Lighting up all onboard LEDs to show the commit process
   // This can be safely removed in the final version
   int state1 = digitalRead(PB0);
@@ -326,7 +327,7 @@ void commit_changes(SerialCommands* sender) {
   digitalWrite(PB0, HIGH);
   digitalWrite(PB7, HIGH);
   digitalWrite(PB14, HIGH);
-
+  
   EEPROM_write(ADDR_TARGET_TEMP, target_temp);
   EEPROM_write(ADDR_PIDP, pidP);
   EEPROM_write(ADDR_PIDI, pidI);
@@ -352,6 +353,20 @@ void commit_changes(SerialCommands* sender) {
   digitalWrite(PB0, state1);
   digitalWrite(PB7, state2);
   digitalWrite(PB14, state3);
+}
+
+//!commit
+/*
+ * In order to persist changes across restarts, the configuration needs to be written to the EEPROM.
+ * As saving them with every value would take up too much time, the write process is centralized in
+ * this function/command. For more information regarding this design decision view the following
+ * stackoverflow question (asked & answered by me):
+ * 
+ * https://stackoverflow.com/questions/51302313/reading-serial-commands-takes-too-much-time
+ */
+void commit_changes(SerialCommands* sender) {
+  _commit();
+
   // DO NOT REMOVE this echo, it acts as a handle for the backend to notice the end of
   // writing process.
   echo(sender, "Changes committed.");
@@ -363,6 +378,11 @@ void commit_changes(SerialCommands* sender) {
 // SERVICE FUNCTIONS //
 //-------------------//
 
+/*
+ * TODO: @Georg
+ * So unfortunately I've never found the time to appropriately test the PID routine.
+ * You should test it once you got access to the real sensors.
+ */
 void setup_PID(void) {
   // Converting relative to absolute 1 byte values
   int minrpm_rel = (minrpm * 255)/100;
@@ -486,6 +506,10 @@ void main_timer() {
   #endif
 }
 
+void auto_commit() {
+  _commit();
+}
+
 //------------------------------------------------------------------------------
 
 //-----------------//
@@ -601,6 +625,7 @@ void setup() {
   }
   save_crc();
   timer.setInterval(500, main_timer);
+  timer_id = timer.setInterval(1000 * 60 * 60 * commit_frequency, auto_commit);
   add_serial_commands();
 
   setup_PID();
